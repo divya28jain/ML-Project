@@ -64,7 +64,7 @@ class DataTransformation:
         except Exception as e:
             raise CustomException(e,sys)
         
-    def initiate_data_transormation(self,train_path,test_path):
+    def initiate_data_transformation(self,train_path,test_path):
         try:
             train_df=pd.read_csv(train_path)
             test_df=pd.read_csv(test_path)
@@ -78,12 +78,12 @@ class DataTransformation:
 
             ## divide the train dataset to independent and dependent feature
 
-            input_features_train_df=train_df.drop(columns=[target_column_name],axis=1)
+            input_features_train_df=train_df.drop(columns=[target_column_name])
             target_feature_train_df=train_df[target_column_name]
 
             ## divide the test dataset to independent and dependent feature
 
-            input_feature_test_df=test_df.drop(columns=[target_column_name],axis=1)
+            input_feature_test_df=test_df.drop(columns=[target_column_name])
             target_feature_test_df=test_df[target_column_name]
 
             logging.info("Applying Preprocessing on training and test dataframe")
@@ -120,4 +120,4 @@ class DataTransformation:
 
 
         except Exception as e:
-            raise CustomException(sys,e)
+            raise CustomException(e, sys)

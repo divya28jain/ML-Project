@@ -1,5 +1,7 @@
 import os
 import sys
+from sqlalchemy import create_engine
+from urllib.parse import quote_plus
 from src.ml_project.exception import CustomException
 from src.ml_project.logger import logging
 import pandas as pd
@@ -7,7 +9,6 @@ from dotenv import load_dotenv
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import r2_score
 import pymysql
-
 import pickle
 import numpy as np
 
@@ -20,25 +21,23 @@ db=os.getenv('db')
 
 
 
+
 def read_sql_data():
     logging.info("Reading SQL database started")
     try:
-        mydb=pymysql.connect(
-            host=host,
-            user=user,
-            password=password,
-            db=db
+        encoded_password = quote_plus(password)
+
+        engine = create_engine(
+            f"mysql+pymysql://{user}:{encoded_password}@{host}/{db}"
         )
-        logging.info("Connection Established: %s", mydb)
-        df=pd.read_sql_query('Select * from students',mydb)
-        print(df.head())
+
+        df = pd.read_sql_query("SELECT * FROM students", engine)
 
         return df
 
 
-
     except Exception as ex:
-        raise CustomException(ex)
+        raise CustomException(ex, sys)
     
 def save_object(file_path, obj):
     try:
