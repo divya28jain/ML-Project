@@ -2,8 +2,13 @@ import os
 import sys
 from dataclasses import dataclass
 import numpy as np
+from urllib.parse import urlparse
+
+import dagshub
+import mlflow
+import mlflow.sklearn
+
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from catboost import CatBoostRegressor
 from sklearn.ensemble import (
     AdaBoostRegressor,
     GradientBoostingRegressor,
@@ -11,6 +16,7 @@ from sklearn.ensemble import (
 )
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
+from catboost import CatBoostRegressor
 from xgboost import XGBRegressor
 
 from src.ml_project.exception import CustomException
@@ -20,7 +26,7 @@ from src.ml_project.utils import save_object, evaluate_models
 
 @dataclass
 class ModelTrainerConfig:
-    trained_model_file_path = os.path.join("artifacts", "model.pkl")
+    trained_model_file_path: str = os.path.join("artifacts", "model.pkl")
 
 
 class ModelTrainer:
@@ -37,12 +43,8 @@ class ModelTrainer:
         try:
             logging.info("Splitting training and test input data")
 
-            X_train, y_train, X_test, y_test = (
-                train_array[:, :-1],
-                train_array[:, -1],
-                test_array[:, :-1],
-                test_array[:, -1],
-            )
+            X_train, y_train = train_array[:, :-1], train_array[:, -1]
+            X_test, y_test = test_array[:, :-1], test_array[:, -1]
 
             models = {
                 "Random Forest": RandomForestRegressor(),
@@ -82,35 +84,58 @@ class ModelTrainer:
                 },
             }
 
-            # Get model performance report
             model_report = evaluate_models(
                 X_train, y_train, X_test, y_test, models, params
             )
 
-            # Get best model score
             best_model_score = max(model_report.values())
-
-            # Get best model name
             best_model_name = max(model_report, key=model_report.get)
             best_model = models[best_model_name]
 
             print("\n🔥 Best Model Found:", best_model_name)
             print("Best R2 Score:", best_model_score)
 
-            # If no good model
             if best_model_score < 0.6:
-                raise CustomException("No best model found")
+                raise CustomException("No good model found")
 
-            # Evaluate metrics
-            predicted = best_model.predict(X_test)
-            rmse, mae, r2 = self.eval_metrics(y_test, predicted)
+            actual_model = best_model_name
+            best_params = params[actual_model]
+
+            dagshub.init(
+                repo_owner="divya28jain",
+                repo_name="ML-Project",
+                mlflow=True,
+            )
+
+            mlflow.set_tracking_uri(
+                "https://dagshub.com/divya28jain/ML-Project.mlflow"
+            )
+
+            tracking_url_type_store = urlparse(
+                mlflow.get_tracking_uri()
+            ).scheme
+
+            with mlflow.start_run():
+
+                predicted = best_model.predict(X_test)
+                rmse, mae, r2 = self.eval_metrics(y_test, predicted)
+
+                mlflow.log_params(best_params)
+                mlflow.log_metric("rmse", rmse)
+                mlflow.log_metric("mae", mae)
+                mlflow.log_metric("r2", r2)
+
+                mlflow.sklearn.log_model(
+                    best_model,
+                    "model",
+                    registered_model_name=actual_model,
+                )
 
             print("\nModel Evaluation Metrics:")
             print("RMSE:", rmse)
             print("MAE:", mae)
             print("R2 Score:", r2)
 
-            # Save model
             save_object(
                 file_path=self.model_trainer_config.trained_model_file_path,
                 obj=best_model,

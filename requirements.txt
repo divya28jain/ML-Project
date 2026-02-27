@@ -6,4 +6,5 @@ pymysql
 seaborn
 catboost
 xgboost
+mlflow
 #-e .
